@@ -1,10 +1,13 @@
+const path = require('path');
+
 class MsntSplitChunksManifestPlugin {
   constructor(options) {
     const defaults = {
-      dist: '',
+      dist: '', // place where config will be stored (should be relative to output folder)
+      distPath: '', // path to add to files path
       ext: 'js',
       name: 'manifest.json',
-      rtlDist: 'rtl/',
+      rtlDist: 'rtl/', // same ad "dist" but for RTL
       rtl: true,
       commonPagesMapping: null
     };
@@ -18,8 +21,7 @@ class MsntSplitChunksManifestPlugin {
     compiler.hooks.emit.tapAsync(
       'MsntSplitChunksManifestPlugin',
       (compilation, cb) => {
-        const mapping = {},
-          mappingRtl = {};
+        const mapping = {};
 
         for (const entry of compilation.entrypoints) {
           const [key, value] = entry;
@@ -30,7 +32,7 @@ class MsntSplitChunksManifestPlugin {
             .getFiles()
             .filter(file => file.endsWith(`.${this.options.ext}`))
             .forEach(file => {
-              mapping[key].push(file);
+              mapping[key].push(this.options.distPath + file);
             });
 
           if (
@@ -45,7 +47,6 @@ class MsntSplitChunksManifestPlugin {
         }
 
         const data = JSON.stringify(mapping);
-        const dataRtl = JSON.stringify(mappingRtl);
 
         compilation.assets[`${this.options.dist}${this.options.name}`] = {
           source() {
@@ -57,12 +58,26 @@ class MsntSplitChunksManifestPlugin {
         };
 
         if (this.options.ext === 'css' && this.options.rtl) {
+          const mappingRtl = Object.assign({}, mapping);
+
+          for (let i in mappingRtl) {
+            mappingRtl[i] = mappingRtl[i].map(
+              file =>
+                path.dirname(file) +
+                '/' +
+                this.options.rtlDist +
+                path.basename(file)
+            );
+          }
+
+          const dataRtl = JSON.stringify(mappingRtl);
+
           compilation.assets[`${this.options.rtlDist}${this.options.name}`] = {
             source() {
-              return data;
+              return dataRtl;
             },
             size() {
-              return data.length;
+              return dataRtl.length;
             }
           };
         }
