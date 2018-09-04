@@ -9,7 +9,8 @@ class MsntSplitChunksManifestPlugin {
       name: 'manifest.json',
       rtlDist: 'rtl/', // same ad "dist" but for RTL
       rtl: true,
-      commonPagesMapping: null
+      skipEmptyCSSEntries: true,
+      commonPagesMapping: null,
     };
 
     this.options = Object.assign(defaults, options);
@@ -32,6 +33,11 @@ class MsntSplitChunksManifestPlugin {
             .getFiles()
             .filter(file => file.endsWith(`.${this.options.ext}`))
             .forEach(file => {
+              if (this.options.ext === 'css' && this.options.skipEmptyCSSEntries) {
+                // skip empty entry css files
+                if (!compilation.assets[file].source().length) return;
+              }
+
               mapping[key].push(this.options.distPath + file);
             });
 
@@ -54,7 +60,7 @@ class MsntSplitChunksManifestPlugin {
           },
           size() {
             return data.length;
-          }
+          },
         };
 
         if (this.options.ext === 'css' && this.options.rtl) {
@@ -78,7 +84,7 @@ class MsntSplitChunksManifestPlugin {
             },
             size() {
               return dataRtl.length;
-            }
+            },
           };
         }
 
