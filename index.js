@@ -9,9 +9,19 @@ class MsntSplitChunksManifestPlugin {
       name: 'manifest.json',
       rtlDist: 'rtl/', // same ad "dist" but for RTL
       rtl: true,
+      checkEmptyRegExp: /html\.svg-build\{.*?\}/g, // RegExp to remove content file and check is it empty (by default removed "html.svg-build{}" blocks)
       skipEmptyCSSEntries: true,
       commonPagesMapping: null,
     };
+
+    if (
+      defaults.checkEmptyRegExp &&
+      !(defaults.checkEmptyRegExp instanceof RegExp)
+    ) {
+      throw new Error(
+        '"checkEmptyRegExp" should be either falsy or instance of RegExp'
+      );
+    }
 
     this.options = Object.assign(defaults, options);
   }
@@ -33,9 +43,19 @@ class MsntSplitChunksManifestPlugin {
             .getFiles()
             .filter(file => file.endsWith(`.${this.options.ext}`))
             .forEach(file => {
-              if (this.options.ext === 'css' && this.options.skipEmptyCSSEntries) {
+              if (
+                this.options.ext === 'css' &&
+                this.options.skipEmptyCSSEntries
+              ) {
+                let source = compilation.assets[file].source();
+
+                // check whether only content of file is html
+                if (this.options.checkEmptyRegExp) {
+                  source = source.replace(this.options.checkEmptyRegExp, '');
+                }
+
                 // skip empty entry css files
-                if (!compilation.assets[file].source().length) return;
+                if (!source.length) return;
               }
 
               mapping[key].push(this.options.distPath + file);
