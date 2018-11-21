@@ -10,6 +10,7 @@ class MsntSplitChunksManifestPlugin {
       rtlDist: 'rtl/', // same ad "dist" but for RTL
       rtl: true,
       checkEmptyRegExp: /html\.svg-build\{.*?\}/g, // RegExp to remove content file and check is it empty (by default removed "html.svg-build{}" blocks)
+      checkSourceMapRegExp: /\/\*#\s*?sourceMappingURL=.*?\s*?\*\//,
       skipEmptyCSSEntries: true,
       commonPagesMapping: null,
     };
@@ -53,9 +54,13 @@ class MsntSplitChunksManifestPlugin {
                 if (this.options.checkEmptyRegExp) {
                   source = source.replace(this.options.checkEmptyRegExp, '');
                 }
+                // check whether only content of file is sourceMap
+                if (this.options.checkSourceMapRegExp) {
+                  source = source.replace(this.options.checkSourceMapRegExp, '');
+                }
 
                 // skip empty entry css files
-                if (!source.length) return;
+                if (!source.trim().length) return;
               }
 
               mapping[key].push(this.options.distPath + file);
