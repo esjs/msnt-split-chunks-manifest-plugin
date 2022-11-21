@@ -7,12 +7,14 @@ class MsntSplitChunksManifestPlugin {
       distPath: '', // path to add to files path
       ext: 'js',
       name: 'manifest.json',
+      nameLazy: 'manifest-lazy.json',
       rtlDist: 'rtl/', // same ad "dist" but for RTL
       rtl: true,
       checkEmptyRegExp: /html\.svg-build\{.*?\}/g, // RegExp to remove content file and check is it empty (by default removed "html.svg-build{}" blocks)
       checkSourceMapRegExp: /\/\*#\s*?sourceMappingURL=.*?\s*?\*\//,
       skipEmptyCSSEntries: true,
       commonPagesMapping: null,
+      ignoreInitialLazyFiles: true,
     };
 
     if (
@@ -34,15 +36,30 @@ class MsntSplitChunksManifestPlugin {
       'MsntSplitChunksManifestPlugin',
       (compilation, cb) => {
         const mapping = {};
+        const mappingLazy = {};
 
         for (const entry of compilation.entrypoints) {
           const [key, value] = entry;
 
-          mapping[key] = [];
+          const isLazy = key.startsWith('lazy__');
 
-          value
+          let files = value
             .getFiles()
-            .filter(file => file.endsWith(`.${this.options.ext}`))
+            .filter(file => file.endsWith(`.${this.options.ext}`));
+          
+          if (this.options.ignoreInitialLazyFiles && isLazy) {
+            files = files.slice(0, -1);
+            
+            if (!files.length) continue;
+          };
+          
+          if (isLazy) {
+            mappingLazy[key] = [];
+          } else {
+            mapping[key] = [];
+          }
+
+          files
             .forEach(file => {
               if (
                 this.options.ext === 'css' &&
@@ -63,7 +80,11 @@ class MsntSplitChunksManifestPlugin {
                 if (!source.trim().length) return;
               }
 
-              mapping[key].push(this.options.distPath + file);
+              if (isLazy) {
+                mappingLazy[key].push(this.options.distPath + file);
+              } else {
+                mapping[key].push(this.options.distPath + file);
+              }
             });
 
           if (
@@ -78,6 +99,7 @@ class MsntSplitChunksManifestPlugin {
         }
 
         const data = JSON.stringify(mapping);
+        const dataLazy = JSON.stringify(mappingLazy);
 
         compilation.assets[`${this.options.dist}${this.options.name}`] = {
           source() {
@@ -87,10 +109,17 @@ class MsntSplitChunksManifestPlugin {
             return data.length;
           },
         };
+        compilation.assets[`${this.options.dist}${this.options.nameLazy}`] = {
+          source() {
+            return dataLazy;
+          },
+          size() {
+            return dataLazy.length;
+          },
+        };
 
         if (this.options.ext === 'css' && this.options.rtl) {
           const mappingRtl = Object.assign({}, mapping);
-
           for (let i in mappingRtl) {
             mappingRtl[i] = mappingRtl[i].map(
               file =>
@@ -101,7 +130,19 @@ class MsntSplitChunksManifestPlugin {
             );
           }
 
+          const mappingLazyRtl = Object.assign({}, mappingLazy);
+          for (let i in mappingLazyRtl) {
+            mappingLazyRtl[i] = mappingLazyRtl[i].map(
+              file =>
+                path.dirname(file) +
+                '/' +
+                this.options.rtlDist +
+                path.basename(file)
+            );
+          }
+
           const dataRtl = JSON.stringify(mappingRtl);
+          const dataLazyRtl = JSON.stringify(mappingLazyRtl);
 
           compilation.assets[`${this.options.rtlDist}${this.options.name}`] = {
             source() {
@@ -109,6 +150,14 @@ class MsntSplitChunksManifestPlugin {
             },
             size() {
               return dataRtl.length;
+            },
+          };
+          compilation.assets[`${this.options.rtlDist}${this.options.nameLazy}`] = {
+            source() {
+              return dataLazyRtl;
+            },
+            size() {
+              return dataLazyRtl.length;
             },
           };
         }
